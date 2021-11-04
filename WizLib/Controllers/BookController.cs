@@ -20,11 +20,17 @@ namespace WizLib.Controllers
         }
         public IActionResult Index()
         {
-            List<Book> objList = _db.Books.Include(u => u.Publisher).ToList();
-            //foreach(var obj in objList)
+            List<Book> objList = _db.Books.Include(u => u.Publisher).Include(u => u.BookAuthors).ThenInclude(u => u.Author).ToList();
+            //List<Book> objList = _db.Books.ToList();
+            //foreach (var obj in objList)
             //{
             //    //obj.Publisher = _db.Publishers.FirstOrDefault(u => u.Publisher_Id == obj.Publisher_Id);
             //    _db.Entry(obj).Reference(u => u.Publisher).Load(); // get all at once and then find
+            //    _db.Entry(obj).Collection(u => u.BookAuthors).Load();
+            //    foreach(var bookAuth in obj.BookAuthors)
+            //    {
+            //        _db.Entry(bookAuth).Reference(u => u.Author).Load();
+            //    }
             //}
             return View(objList);
         }
@@ -114,52 +120,122 @@ namespace WizLib.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        public IActionResult ManageAuthors(int id)
+        {
+            BookAuthorVM obj = new BookAuthorVM
+            {
+                BookAuthorList = _db.BookAuthors.Include(u => u.Author).Include(u => u.Book)
+                                                    .Where(u => u.Book_Id == id).ToList(),
+                BookAuthor = new BookAuthor()
+                {
+                    Book_Id = id
+                },
+                Book = _db.Books.FirstOrDefault(u => u.Book_Id == id)
+            };
+            List<int> tempListOfAssignedAuthors = obj.BookAuthorList.Select(u => u.Author_Id).ToList();
+            // NOT IN Clause in Linq
+            // get all the authors with id is not in tempListofAssignedAuthors
+            var tempList = _db.Authors.Where(u => !tempListOfAssignedAuthors.Contains(u.Author_Id)).ToList();
+
+            obj.AuthorList = tempList.Select(i => new SelectListItem 
+            { 
+                Text = i.FullName,
+                Value = i.Author_Id.ToString()
+            });
+            return View(obj);
+        }
+
+        [HttpPost]
+        public IActionResult ManageAuthors(BookAuthorVM bookAuthorVM)
+        {
+            if(bookAuthorVM.BookAuthor.Book_Id != 0 && bookAuthorVM.BookAuthor.Author_Id !=0)
+            {
+                _db.BookAuthors.Add(bookAuthorVM.BookAuthor);
+                _db.SaveChanges();
+            }
+            return RedirectToAction(nameof(ManageAuthors), new { @id = bookAuthorVM.BookAuthor.Book_Id });
+        }
+
+        [HttpPost]
+        public IActionResult RemoveAuthors(int authorId, BookAuthorVM bookAuthorVM)
+        {
+            int bookId = bookAuthorVM.Book.Book_Id;
+            BookAuthor bookAuthor = _db.BookAuthors.FirstOrDefault(u => u.Author_Id == authorId && u.Book_Id == bookId);
+
+            _db.BookAuthors.Remove(bookAuthor);
+            _db.SaveChanges();
+
+            return RedirectToAction(nameof(ManageAuthors), new { @id = bookId });
+        }
+
         public IActionResult PlayGround()
         {
-            var bookTemp = _db.Books.FirstOrDefault();
-            bookTemp.Price = 100;
+            //var bookTemp = _db.Books.FirstOrDefault();
+            //bookTemp.Price = 100;
 
-            var bookCollection = _db.Books;
-            double totalPrice = 0;
+            //var bookCollection = _db.Books;
+            //double totalPrice = 0;
 
-            foreach (var book in bookCollection)
-            {
-                totalPrice += book.Price;
-            }
+            //foreach (var book in bookCollection)
+            //{
+            //    totalPrice += book.Price;
+            //}
 
-            var bookList = _db.Books.ToList();
-            foreach (var book in bookList)
-            {
-                totalPrice += book.Price;
-            }
+            //var bookList = _db.Books.ToList();
+            //foreach (var book in bookList)
+            //{
+            //    totalPrice += book.Price;
+            //}
 
-            var bookCollection2 = _db.Books;
-            var bookCount1 = bookCollection2.Count();
+            //var bookCollection2 = _db.Books;
+            //var bookCount1 = bookCollection2.Count();
 
-            var bookCount2 = _db.Books.Count();
+            //var bookCount2 = _db.Books.Count();
 
-            IEnumerable<Book> BookList1 = _db.Books;
-            var FilteredBook1 = BookList1.Where(b => b.Price > 500).ToList();
+            //IEnumerable<Book> BookList1 = _db.Books;
+            //var FilteredBook1 = BookList1.Where(b => b.Price > 500).ToList();
 
-            IQueryable<Book> BookList2 = _db.Books;
-            var FilteredBook2 = BookList2.Where(b => b.Price > 500).ToList();
+            //IQueryable<Book> BookList2 = _db.Books;
+            //var FilteredBook2 = BookList2.Where(b => b.Price > 500).ToList();
 
-            //var category = _db.Categories.FirstOrDefault();
-            //_db.Entry(category).State = EntityState.Modified;
+            ////var category = _db.Categories.FirstOrDefault();
+            ////_db.Entry(category).State = EntityState.Modified;
 
+            ////_db.SaveChanges();
+
+            //var bookTemp1 = _db.Books.Include(b => b.BookDetail).FirstOrDefault(b => b.Book_Id == 4);
+            //bookTemp1.BookDetail.NumberOfChapters = 2222;
+            //_db.Books.Update(bookTemp1);
             //_db.SaveChanges();
 
-            var bookTemp1 = _db.Books.Include(b => b.BookDetail).FirstOrDefault(b => b.Book_Id == 4);
-            bookTemp1.BookDetail.NumberOfChapters = 2222;
-            _db.Books.Update(bookTemp1);
-            _db.SaveChanges();
+            //var bookTemp2 = _db.Books.Include(b => b.BookDetail).FirstOrDefault(b => b.Book_Id == 4);
+            //bookTemp2.BookDetail.Weight = 3333;
+            //_db.Books.Attach(bookTemp2); // edit just this attribute
+            //_db.SaveChanges();
 
-            var bookTemp2 = _db.Books.Include(b => b.BookDetail).FirstOrDefault(b => b.Book_Id == 4);
-            bookTemp2.BookDetail.Weight = 3333;
-            _db.Books.Attach(bookTemp2); // edit just this attribute
-            _db.SaveChanges();
+            // views
+            var viewList = _db.BookDetailsFromViews.ToList();
+            var viewList1 = _db.BookDetailsFromViews.FirstOrDefault();
+            var viewList2 = _db.BookDetailsFromViews.Where(u => u.Price > 500);
+
+            // raw sql
+            var bookRaw = _db.Books.FromSqlRaw("Select * from dbo.books").ToList(); // w/o parameters
+
+            // sql injection, attack prone
+            int id = 2;
+            var bookTemp1 = _db.Books.FromSqlInterpolated($"Select * from dbo.books where Book_Id={id}").ToList();
+
+            var booksSproc = _db.Books.FromSqlInterpolated($" EXEC dbo.getAllBookDetails {id}").ToList();
+
+            // .NET 5 ONLY
+
+            var bookFilter1 = _db.Books.Include(e => e.BookAuthors.Where(p => p.Author_Id == 2)).ToList();
+            var bookFilter2 = _db.Books.Include(e => e.BookAuthors.OrderByDescending(p => p.Author_Id).Take(5)).ToList(); // get last five
+
 
             return RedirectToAction(nameof(Index));
+
+
         }
 
     }
